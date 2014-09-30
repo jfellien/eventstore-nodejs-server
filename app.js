@@ -22,6 +22,7 @@ server.post('/store', unableToStoreEvent);
 server.post('/store/:account', storeEvent);
 server.get('/events/:account', readAllAccountEvents);
 server.get('/events/:account/:entityId', readAllEntityEvents);
+server.del('/remove/:account', removeEventStoreForAnAccount);
 
 
 // Define actions
@@ -91,6 +92,8 @@ function storeEvent(req, res, next) {
                             return console.error('error running INSERT query', err);
                         }
 
+                        res.send(200);
+
                         dbClient.end();
 
                         console.log('Account %s writes an event', account);
@@ -129,6 +132,7 @@ function readAllAccountEvents(req,res, next){
         dbClient.query(selectAllEventsQuery, function(err, result){
 
             if(err) {
+                res.send(200, err);
                 return console.error('error running SELECT ALL query', err);
             }
 
@@ -138,7 +142,6 @@ function readAllAccountEvents(req,res, next){
             res.send(200, result.rows);
 
             dbClient.end();
-
 
         });
 
@@ -175,6 +178,7 @@ function readAllEntityEvents(req,res, next){
         dbClient.query(selectAllEventsQuery, [entityId], function(err, result){
 
             if(err) {
+                res.send(200, err);
                 return console.error('error running SELECT BY ENTITY query', err);
             }
 
@@ -187,6 +191,49 @@ function readAllEntityEvents(req,res, next){
 
         });
 
-    })
+    });
+
+}
+
+function removeEventStoreForAnAccount(req, res, next){
+    // Check for existing Account Parameter
+    if (req.params.account === undefined) {
+
+        console.log('Account must be supplied');
+
+        return next(new restify.InvalidArgumentError('Account must be supplied'))
+    }
+
+    var account = req.params.account;
+
+    console.log('Account %s will remove the event store', account);
+
+    var dbClient = new pg.Client(connectionString);
+
+    dbClient.connect(function(err){
+
+        if(err) {
+            return console.error('could not connect to postgres', err);
+        }
+
+        var removeEventStoreQuery =
+            'DROP TABLE IF EXISTS ' + account;
+
+        dbClient.query(removeEventStoreQuery, function(err, result){
+
+            if(err) {
+                return console.error('error running DROP TABLE query', err);
+            }
+
+            console.log('Account %s have removed its event store', account);
+
+            res.contentType = 'json';
+            res.send(200, '{"Message":"EventStore removed"}');
+
+            dbClient.end();
+
+        });
+
+    });
 
 }
