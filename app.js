@@ -20,6 +20,8 @@ server
 
 server.post('/store', unableToStoreEvent);
 server.post('/store/:account', storeEvent);
+server.get('/events/:account', readAllAccountEvents);
+server.get('/events/:account/:entityId', readAllEntityEvents);
 
 
 // Define actions
@@ -44,7 +46,7 @@ function storeEvent(req, res, next) {
     var account = req.params.account;
     var parameters = req.params;
 
-    console.log('Account %s', account);
+    console.log('Account %s will write an event', account);
 
     var dbClient = new pg.Client(connectionString);
 
@@ -67,7 +69,7 @@ function storeEvent(req, res, next) {
             function(err, result) {
 
                 if(err) {
-                    return console.error('error running query', err);
+                    return console.error('error running CREATE TABLE query', err);
                 }
 
                 var saveEventQuery = 'INSERT INTO '
@@ -86,14 +88,105 @@ function storeEvent(req, res, next) {
                     function(err, result) {
 
                         if(err) {
-                            return console.error('error running query', err);
+                            return console.error('error running INSERT query', err);
                         }
 
                         dbClient.end();
+
+                        console.log('Account %s writes an event', account);
                     });
         });
 
     });
 
     res.send(200)
+}
+
+function readAllAccountEvents(req,res, next){
+
+    // Check for existing Account Parameter
+    if (req.params.account === undefined) {
+
+        console.log('Account must be supplied');
+
+        return next(new restify.InvalidArgumentError('Account must be supplied'))
+    }
+
+    var account = req.params.account;
+
+    console.log('Account %s will read all events', account);
+
+    var dbClient = new pg.Client(connectionString);
+
+    dbClient.connect(function(err){
+
+        if(err) {
+            return console.error('could not connect to postgres', err);
+        }
+
+        var selectAllEventsQuery = 'SELECT * FROM ' + account;
+
+        dbClient.query(selectAllEventsQuery, function(err, result){
+
+            if(err) {
+                return console.error('error running SELECT ALL query', err);
+            }
+
+            console.log('Account %s has read %s events', account, result.rows.length);
+
+            res.contentType = 'json';
+            res.send(200, result.rows);
+
+            dbClient.end();
+
+
+        });
+
+    })
+
+}
+
+function readAllEntityEvents(req,res, next){
+
+    // Check for existing Account Parameter
+    if (req.params.account === undefined) {
+
+        console.log('Account must be supplied');
+
+        return next(new restify.InvalidArgumentError('Account must be supplied'))
+    }
+
+    var account = req.params.account;
+    var entityId = req.params.entityId;
+
+    console.log('Account %s will read all events for entity %s', account, entityId);
+
+    var dbClient = new pg.Client(connectionString);
+
+    dbClient.connect(function(err){
+
+        if(err) {
+            return console.error('could not connect to postgres', err);
+        }
+
+        var selectAllEventsQuery =
+            'SELECT * FROM ' + account + ' WHERE entityid = $1';
+
+        dbClient.query(selectAllEventsQuery, [entityId], function(err, result){
+
+            if(err) {
+                return console.error('error running SELECT BY ENTITY query', err);
+            }
+
+            console.log('Account %s has read %s events for entity %s', account, result.rows.length, entityId);
+
+            res.contentType = 'json';
+            res.send(200, result.rows);
+
+            dbClient.end();
+
+        });
+
+    })
+
 }
