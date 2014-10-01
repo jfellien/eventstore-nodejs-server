@@ -18,6 +18,7 @@ server
 
 // Define Routes
 
+server.post('/init/:account', createEventStoreIfNotExists);
 server.post('/store', unableToStoreEvent);
 server.post('/store/:account', storeEvent);
 server.get('/events/:account', readAllAccountEvents);
@@ -27,11 +28,56 @@ server.del('/remove/:account', removeEventStoreForAnAccount);
 
 // Define actions
 
+function createEventStoreIfNotExists(req, res, next) {
+
+    // Check for existing Account Parameter
+    if (req.params.account === undefined) {
+
+        console.log('Account must be supplied');
+
+        return next(new restify.InvalidArgumentError('Account must be supplied'))
+    }
+
+    var account = req.params.account;
+
+    console.log('Account %s will create its own event store', account);
+
+    pg.connect(connectionString, function(err, dbClient, done){
+
+        if(err) {
+            return console.error('could not connect to postgres', err);
+        }
+
+        var createIfNotExistsQuery = 'CREATE TABLE IF NOT EXISTS '
+            + account
+            + '('
+            + 'rowId bigserial primary key,'
+            + 'entityId varchar(64), '
+            + 'eventId varchar(64), '
+            + 'eventType varchar(128), '
+            + 'eventData varchar(512), '
+            + 'eventTime varchar(64))';
+
+        dbClient.query(createIfNotExistsQuery,
+            function(err, result) {
+
+                done();
+
+                if(err) {
+                    return console.error('error running CREATE TABLE query', err);
+                }
+            });
+
+    });
+
+    res.send(200)
+}
+
 function unableToStoreEvent(req, res, next) {
 
     console.log('Account must be supplied')
 
-    res.send(404, "Account must be supplied")
+    return next(new restify.InvalidArgumentError('Account must be supplied'))
 }
 
 function storeEvent(req, res, next) {
@@ -47,62 +93,44 @@ function storeEvent(req, res, next) {
     var account = req.params.account;
     var parameters = req.params;
 
-    console.log('Account %s will write an event', account);
+    console.log('Event with Id : %s will write for Account : %s ', parameters.EventId, account);
 
-    var dbClient = new pg.Client(connectionString);
+    pg.connect(connectionString,
+        function(err, dbClient, done){
 
-    dbClient.connect(function(err){
+            if(err) {
+                return console.error('could not connect to postgres', err);
+            }
 
-        if(err) {
-            return console.error('could not connect to postgres', err);
-        }
+            var saveEventQuery =
+                'INSERT INTO '
+                + account
+                + '(entityId, eventId, eventType, eventData, eventTime) '
+                + 'values($1, $2, $3, $4, $5)';
 
-        var createIfNotExistsQuery = 'CREATE TABLE IF NOT EXISTS '
-            + account
-            + '('
-            + 'entityId varchar(64), '
-            + 'eventId varchar(64), '
-            + 'eventType varchar(128), '
-            + 'eventData varchar(512), '
-            + 'eventTime varchar(64))';
+            dbClient.query(saveEventQuery,
+                [
+                    parameters.EntityId,
+                    parameters.EventId,
+                    parameters.EventType,
+                    parameters.EventData,
+                    parameters.TimeStamp
+                ],
+                function(err, result) {
 
-        dbClient.query(createIfNotExistsQuery,
-            function(err, result) {
+                    done();
 
-                if(err) {
-                    return console.error('error running CREATE TABLE query', err);
-                }
+                    if(err) {
+                        return console.error('error running INSERT query', err);
+                    }
 
-                var saveEventQuery = 'INSERT INTO '
-                    + account
-                    + '(entityId, eventId, eventType, eventData, eventTime) '
-                    + 'values($1, $2, $3, $4, $5)';
+                    console.log('Event for Account %s has been written', account);
 
-                dbClient.query(saveEventQuery,
-                    [
-                        parameters.EntityId,
-                        parameters.EventId,
-                        parameters.EventType,
-                        parameters.EventData,
-                        parameters.TimeStamp
-                    ],
-                    function(err, result) {
+                    res.send(200, result);
 
-                        if(err) {
-                            return console.error('error running INSERT query', err);
-                        }
+                });
 
-                        res.send(200);
-
-                        dbClient.end();
-
-                        console.log('Account %s writes an event', account);
-                    });
         });
-
-    });
-
-    res.send(200)
 }
 
 function readAllAccountEvents(req,res, next){
@@ -127,7 +155,7 @@ function readAllAccountEvents(req,res, next){
             return console.error('could not connect to postgres', err);
         }
 
-        var selectAllEventsQuery = 'SELECT * FROM ' + account;
+        var selectAllEventsQuery = 'SELECT entityId, eventId, eventType, eventData, eventTime FROM ' + account;
 
         dbClient.query(selectAllEventsQuery, function(err, result){
 
@@ -173,7 +201,9 @@ function readAllEntityEvents(req,res, next){
         }
 
         var selectAllEventsQuery =
-            'SELECT * FROM ' + account + ' WHERE entityid = $1';
+                'SELECT entityId, eventId, eventType, eventData, eventTime FROM '
+                + account + ' '
+                + 'WHERE entityid=$1';
 
         dbClient.query(selectAllEventsQuery, [entityId], function(err, result){
 
