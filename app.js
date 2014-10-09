@@ -1,6 +1,6 @@
 
 var restify = require('restify');
-var db_server = require('./postgresql-db-server.js');
+var db_server = require('./nedb-server.js');
 
 var connectionString = "pg://OpenSpaceGuest:OpenSpace2014@localhost:5432/OpenSpace";
 
@@ -41,14 +41,7 @@ function createEventStoreIfNotExists(req, res, next) {
 
     console.log('Account %s will create its own event store', account);
 
-    db_server.createEventStoreFor(connectionString, account, function(err, result){
-
-        if(err){
-            res.send(500, err);
-        }
-
-        res.send(200)
-    });
+    res.send(200)
 }
 
 function storeEvent(req, res, next) {
@@ -66,7 +59,7 @@ function storeEvent(req, res, next) {
 
     console.log('Event with Id : %s will write for Account : %s ', parameters.EventId, account);
 
-    db_server.storeEvent(connectionString, account, parameters, function(err, result){
+    db_server.storeEvent(account, parameters, function(err, result){
 
         if(err){
             res.send(500, err);
@@ -91,13 +84,14 @@ function readAllAccountEvents(req,res, next){
 
     console.log('Account %s will read all events', account);
 
-    db_server.readAllAccountEvents(connectionString, account, function(err, result){
+    db_server.readAllAccountEvents(account, function(err, result){
+
         if(err){
             res.send(500, err);
         }
 
         res.contentType = 'json';
-        res.send(200, result.rows);
+        res.send(200, result);
     });
 
 }
@@ -117,13 +111,13 @@ function readAllEntityEvents(req,res, next){
 
     console.log('Account %s will read all events for entity %s', account, entityId);
 
-    db_server.readAllEntityEvents(connectionString, account, entityId, function(err,result){
+    db_server.readAllEntityEvents(account, entityId, function(err,result){
         if(err){
             res.send(500, err);
         }
 
         res.contentType = 'json';
-        res.send(200, result.rows);
+        res.send(200, result);
     })
 }
 
@@ -140,13 +134,13 @@ function removeEventStoreForAnAccount(req, res, next){
 
     console.log('Account %s will remove the event store', account);
 
-    db_server.removeEventStore(connectionString,account, function(err, result){
+    db_server.removeEventStore(account, function(err, result){
 
         if(err){
             res.send(500, err);
         }
 
         res.contentType = 'json';
-        res.send(200, '{"Message":"EventStore removed"}');
+        res.send(200, result);
     });
-}
+};

@@ -12,33 +12,21 @@ exports.storeEvent = function(account, parameters, callback){
         timeStamp : parameters.TimeStamp
     };
 
-    db.insert(accountEvent);
+    db.insert(accountEvent, callback);
 };
 
 exports.readAllAccountEvents = function(account, callback){
 
-    db.find({account : account}, function(err, events){
-
-        callback(err, events);
-
-    });
+    db.find({account : account}, callback);
 
 };
 
 exports.readAllEntityEvents = function(account, entityId, callback){
 
-    db.find({account : account, entityId : entityId}, function(err, events){
-
-        callback(err, events);
-
-    })
+    db.find({account : account, entityId : entityId}, callback)
 };
 
 exports.removeEventStore = function(account, callback){
 
-    db.remove({account : account}, function(err, result){
-
-        callback(err, result);
-
-    })
+    db.remove({account : account}, {multi : true}, callback)
 };
