@@ -2,18 +2,17 @@
 var restify = require('restify');
 var db_server = require('./nedb-server.js');
 
-var connectionString = "pg://OpenSpaceGuest:OpenSpace2014@localhost:5432/OpenSpace";
-
+var port = process.env.PORT || 3000;
 
 var server = restify.createServer({ name: 'sample-node-server' });
 
-server.listen(3000, function () {
+server.listen(port, function () {
     console.log('%s listening at %s', server.name, server.url)
 });
 
 server
   .use(restify.fullResponse())
-  .use(restify.bodyParser())
+  .use(restify.bodyParser());
 
 
 // Define Routes
